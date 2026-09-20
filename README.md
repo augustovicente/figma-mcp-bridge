@@ -15,6 +15,9 @@
 
 <br/>
 
+> [!NOTE]  
+> Requires the Figma desktop app (macOS/Windows). The browser version of Figma does not support importing development plugins.
+
 While other amazing Figma MCP servers like [Figma-Context-MCP](https://github.com/GLips/Figma-Context-MCP/) exist, one issues is the [API limiting](https://github.com/GLips/Figma-Context-MCP/issues/258) for free users.
 
 The limit for free accounts is 6 requests per month, yes **per month**.
@@ -211,7 +214,7 @@ The MCP server is the core of the Figma MCP Bridge. It maintains a registry of W
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              FIGMA (Browser)                                │
+│                           FIGMA (Desktop app)                               │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
 │  │                         Figma Plugin                                  │  │
 │  │                    (TypeScript/React)                                 │  │
