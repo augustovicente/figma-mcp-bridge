@@ -6,6 +6,7 @@ type RequestType =
   | "get_document"
   | "get_selection"
   | "get_node"
+  | "get_layout_tree"
   | "get_styles"
   | "get_metadata"
   | "get_design_context"
@@ -367,6 +368,59 @@ const requireEditorMode = (toolName: RequestType): void => {
   }
 };
 
+/** Read-only geometry, deliberately independent of screenshot export. */
+async function getLayoutTree(rootId: string, maxNodes = 2000) {
+  const root = await figma.getNodeByIdAsync(rootId);
+  if (!root || root.type === "DOCUMENT" || root.type === "PAGE")
+    throw new Error("Scene root required");
+  const nodes: unknown[] = [];
+  let truncated = false;
+  function visit(node: SceneNode, depth: number) {
+    if (nodes.length >= maxNodes || depth > 100) {
+      truncated = true;
+      return;
+    }
+    nodes.push({
+      id: node.id,
+      parentId: node.parent?.id,
+      name: node.name,
+      type: node.type,
+      visible: node.visible,
+      localSize: { width: node.width, height: node.height },
+      absoluteTransform: node.absoluteTransform,
+      absoluteBoundingBox: node.absoluteBoundingBox,
+      absoluteRenderBounds: node.absoluteRenderBounds,
+      clipsContent: "clipsContent" in node ? node.clipsContent : false,
+    });
+    if ("children" in node) for (const child of node.children) visit(child, depth + 1);
+  }
+  visit(root, 0);
+  return {
+    schemaVersion: 1,
+    snapshotId: new Date().toISOString(),
+    atomicWithScreenshot: false,
+    fileKey: figma.fileKey ?? null,
+    fileName: figma.root.name,
+    pageId: figma.currentPage.id,
+    rootId,
+    truncated,
+    nodes,
+    capture: {
+      coordinateSpace: "document-absolute",
+      window: root.absoluteBoundingBox,
+      exportSettings: {
+        format: "PNG",
+        contentsOnly: true,
+        useAbsoluteBounds: true,
+        constraint: { type: "SCALE", value: 1 },
+      },
+      dimensionsAreMeasuredFromImage: false,
+      clipping:
+        "Rectangles are layout AABBs; ancestor masks and painted visibility are not evaluated.",
+    },
+  };
+}
+
 const handleRequest = async (request: ServerRequest): Promise<PluginResponse> => {
   try {
     if (EDIT_REQUEST_TYPES.has(request.type)) {
@@ -385,6 +439,15 @@ const handleRequest = async (request: ServerRequest): Promise<PluginResponse> =>
           requestId: request.requestId,
           data: figma.currentPage.selection.map((node) => serializeNode(node)),
         };
+      case "get_layout_tree": {
+        const rootId = request.nodeIds?.[0];
+        if (!rootId) throw new Error("rootId is required");
+        return {
+          type: request.type,
+          requestId: request.requestId,
+          data: await getLayoutTree(rootId, Number(request.params?.maxNodes ?? 2000)),
+        };
+      }
       case "get_node": {
         const nodeId = request.nodeIds && request.nodeIds[0];
         if (!nodeId) {
