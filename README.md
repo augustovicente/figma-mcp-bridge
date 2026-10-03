@@ -194,16 +194,6 @@ bun run format        # format the whole repo
 bun run format:check  # verify formatting without writing (useful in CI)
 ```
 
-### Testing
-
-This repo uses [Bun](https://bun.sh) as its test runner. Run the test suite with:
-
-```bash
-bun test
-```
-
-Tests live in `server/test/` and validate zod schemas and other pure logic. The test suite currently covers schema validation for `create_section` and `create_shape_with_text`, ensuring inputs are accepted/rejected as expected.
-
 ## Structure
 
 ```
