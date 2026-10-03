@@ -160,30 +160,24 @@ const getSceneNodeById = async (nodeId: string): Promise<SceneNode> => {
 };
 
 /**
- * Resolves a node whose text can be edited: a TEXT node itself, or the text
- * sublayer of a FigJam STICKY / SHAPE_WITH_TEXT node. The returned `node` is
- * the outer scene node (for id/name/position), `text` is the editable target.
+ * A node whose text can be edited: a TEXT node itself, or the text sublayer of
+ * a FigJam STICKY / SHAPE_WITH_TEXT node. `node` is the outer scene node (for
+ * id/name/position), `text` is the editable target.
  */
-const getTextTargetById = async (
-  nodeId: string,
-  toolName: string
-): Promise<{
-  node: TextNode | StickyNode | ShapeWithTextNode;
-  text: TextNode | TextSublayerNode;
-  isTextNode: boolean;
-}> => {
+type TextTarget =
+  | { kind: "text"; node: TextNode; text: TextNode }
+  | { kind: "sublayer"; node: StickyNode | ShapeWithTextNode; text: TextSublayerNode };
+
+const getTextTargetById = async (nodeId: string, toolName: string): Promise<TextTarget> => {
   const node = await figma.getNodeByIdAsync(nodeId);
   if (!isSceneNode(node)) {
     throw new Error(`Node not found: ${nodeId}`);
   }
   if (node.type === "TEXT") {
-    return { node, text: node, isTextNode: true };
+    return { kind: "text", node, text: node };
   }
-  if (node.type === "STICKY") {
-    return { node, text: node.text, isTextNode: false };
-  }
-  if (node.type === "SHAPE_WITH_TEXT") {
-    return { node, text: node.text, isTextNode: false };
+  if (node.type === "STICKY" || node.type === "SHAPE_WITH_TEXT") {
+    return { kind: "sublayer", node, text: node.text };
   }
   throw new Error(
     `${toolName} supports TEXT, STICKY, and SHAPE_WITH_TEXT nodes (got ${node.type}: ${nodeId})`
@@ -367,13 +361,7 @@ const decodeBase64ToBytes = (base64: string): Uint8Array => {
   }
 };
 
-const isFigJam = (): boolean => {
-  try {
-    return figma.editorType === "figjam";
-  } catch {
-    return false;
-  }
-};
+const isFigJam = (): boolean => figma.editorType === "figjam";
 
 /**
  * Guards the FigJam-only `figma.create*` helpers. Returns a clear error when the
@@ -624,24 +612,6 @@ const handleRequest = async (request: ServerRequest): Promise<PluginResponse> =>
         };
       }
       case "get_metadata": {
-        if (isFigJam()) {
-          const pages = figma.root.children.map((p) => ({
-            id: p.id,
-            name: p.name,
-          }));
-          return {
-            type: request.type,
-            requestId: request.requestId,
-            data: {
-              editorType: "figjam",
-              fileName: figma.root.name,
-              currentPageId: figma.currentPage.id,
-              currentPageName: figma.currentPage.name,
-              pageCount: pages.length,
-              pages,
-            },
-          };
-        }
         return {
           type: request.type,
           requestId: request.requestId,
@@ -966,12 +936,12 @@ const handleRequest = async (request: ServerRequest): Promise<PluginResponse> =>
           params.textAlignVertical !== undefined ||
           params.textAutoResize !== undefined
         ) {
-          if (!target.isTextNode) {
+          if (target.kind !== "text") {
             throw new Error(
               "textAlignHorizontal/textAlignVertical/textAutoResize are only supported on TEXT nodes — they do not exist on STICKY/SHAPE_WITH_TEXT text"
             );
           }
-          const node = target.node as TextNode;
+          const node = target.node;
           if (
             params.textAlignHorizontal === "LEFT" ||
             params.textAlignHorizontal === "CENTER" ||

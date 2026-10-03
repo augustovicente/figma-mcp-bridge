@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ShapeWithTextNode } from "@figma/plugin-typings/plugin-api-standalone.js";
 
 /**
  * Figma node IDs:
@@ -39,7 +40,10 @@ const textAlignHorizontal = z.enum(["LEFT", "CENTER", "RIGHT", "JUSTIFIED"]);
 const textAlignVertical = z.enum(["TOP", "CENTER", "BOTTOM"]);
 const textAutoResize = z.enum(["NONE", "WIDTH_AND_HEIGHT", "HEIGHT", "TRUNCATE"]);
 const shapeType = z.enum(["RECTANGLE", "ELLIPSE", "LINE"]);
-const figJamShapeType = z.enum([
+
+type FigJamShapeType = ShapeWithTextNode["shapeType"];
+
+const FIGJAM_SHAPE_TYPES = [
   "SQUARE",
   "ELLIPSE",
   "ROUNDED_RECTANGLE",
@@ -70,7 +74,13 @@ const figJamShapeType = z.enum([
   "OR",
   "SPEECH_BUBBLE",
   "INTERNAL_STORAGE",
-]);
+] as const satisfies readonly FigJamShapeType[];
+
+/* Type gymnastics to ensure all shape types are listed on transpile time */
+type UnlistedShapeType = Exclude<FigJamShapeType, (typeof FIGJAM_SHAPE_TYPES)[number]>;
+const allShapeTypesListed: [UnlistedShapeType] extends [never] ? true : UnlistedShapeType = true;
+
+const figJamShapeType = z.enum(FIGJAM_SHAPE_TYPES);
 const imageScaleMode = z.enum(["FILL", "FIT"]);
 
 const fileKeyField = z
